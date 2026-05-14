@@ -1,0 +1,1427 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Jean的 AI 成长仪表板</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', sans-serif;
+      background: #f0eef8;
+      color: #1d1d1f;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: linear-gradient(135deg, #1a1035 0%, #2d1b69 60%, #4c1d95 100%);
+      color: white;
+      padding: 2.5rem 3rem 2.5rem 340px;
+      min-height: 320px;
+      display: flex;
+      align-items: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .header-bg-img {
+      position: absolute;
+      left: 0;
+      top: -55px;
+      width: 310px;
+      height: auto;
+      pointer-events: none;
+      -webkit-mask-image: linear-gradient(to right, black 25%, rgba(0,0,0,0.5) 60%, transparent 95%);
+      mask-image: linear-gradient(to right, black 25%, rgba(0,0,0,0.5) 60%, transparent 95%);
+    }
+    .header-top { display: flex; align-items: flex-start; position: relative; z-index: 1; }
+    .header-label { font-size: 0.85rem; opacity: 0.6; font-weight: 400; margin-bottom: 0.75rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .level-row { display: flex; align-items: baseline; gap: 1rem; }
+    .level-num { font-size: 5rem; font-weight: 800; color: #c4b5fd; line-height: 1; }
+    .level-name { font-size: 2.2rem; font-weight: 700; }
+    .level-desc { margin-top: 0.6rem; opacity: 0.65; font-size: 0.95rem; line-height: 1.6; max-width: 500px; }
+
+    /* ── Progress Bar ── */
+    .progress-section {
+      background: white;
+      padding: 1.25rem 3rem;
+      border-bottom: 1px solid #e8e0f5;
+    }
+    .progress-meta { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.6rem; }
+    .progress-meta-label { font-size: 0.8rem; color: #888; font-weight: 500; }
+    .progress-meta-next { font-size: 0.8rem; color: #7c3aed; font-weight: 600; }
+    .progress-track { display: flex; gap: 5px; }
+    .progress-step {
+      flex: 1; height: 10px; border-radius: 5px;
+      background: #ede9fe;
+      position: relative; cursor: default;
+    }
+    .progress-step.filled { background: #c4b5fd; }
+    .progress-step.current { background: #7c3aed; box-shadow: 0 0 8px rgba(124,58,237,0.5); }
+    .progress-step:hover::after {
+      content: attr(data-label);
+      position: absolute; top: -30px; left: 50%; transform: translateX(-50%);
+      background: #1a1035; color: white;
+      padding: 3px 8px; border-radius: 6px;
+      font-size: 0.72rem; white-space: nowrap;
+      pointer-events: none; z-index: 10;
+    }
+    .progress-labels { display: flex; justify-content: space-between; margin-top: 0.5rem; }
+    .progress-labels span { font-size: 0.72rem; color: #bbb; }
+
+    /* ── Main grid ── */
+    .main { padding: 2rem 3rem; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 1.5rem; }
+
+    .card {
+      background: white; border-radius: 16px; padding: 1.5rem;
+      box-shadow: 0 1px 4px rgba(76,29,149,0.07);
+    }
+    .card-title {
+      font-size: 0.75rem; font-weight: 700; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1.25rem;
+    }
+
+    /* ── Dimensions ── */
+    .dim-list { display: flex; flex-direction: column; gap: 1.1rem; }
+    .dim-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.4rem; }
+    .dim-name { font-size: 0.9rem; font-weight: 600; }
+    .dim-sub { font-size: 0.75rem; color: #aaa; font-weight: 400; }
+    .dim-score { font-size: 1rem; font-weight: 800; color: #7c3aed; }
+    .dim-bar { height: 7px; background: #f3f0ff; border-radius: 4px; overflow: hidden; }
+    .dim-fill { height: 100%; background: linear-gradient(90deg, #c4b5fd, #7c3aed); border-radius: 4px; transition: width 1s ease; }
+
+    /* ── Radar chart ── */
+    .radar-wrap { position: relative; height: 300px; display: flex; align-items: center; justify-content: center; }
+
+    /* ── Why Lv.7 ── */
+    .why-card { margin-bottom: 1.5rem; }
+    .why-list { display: flex; flex-direction: column; gap: 0.75rem; }
+    .why-item {
+      display: flex; gap: 0.75rem; align-items: flex-start;
+      padding: 0.75rem 1rem;
+      background: #f9f7ff;
+      border-radius: 10px;
+      border-left: 3px solid #7c3aed;
+    }
+    .why-check {
+      min-width: 20px; height: 20px;
+      background: #7c3aed; color: white;
+      border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 0.65rem; font-weight: 800; margin-top: 1px;
+    }
+    .why-text { font-size: 0.88rem; line-height: 1.6; color: #374151; }
+    .why-label { font-weight: 700; color: #1d1d1f; }
+
+    /* ── Timeline ── */
+    .timeline-card { margin-bottom: 1.5rem; }
+    .timeline-pills {
+      display: flex; gap: 6px; overflow-x: auto; padding-bottom: 0.5rem;
+      scrollbar-width: thin; scrollbar-color: #e8e0f5 transparent;
+    }
+    .timeline-pills::-webkit-scrollbar { height: 4px; }
+    .timeline-pills::-webkit-scrollbar-track { background: transparent; }
+    .timeline-pills::-webkit-scrollbar-thumb { background: #e8e0f5; border-radius: 2px; }
+    .tl-pill {
+      flex-shrink: 0; padding: 0.35rem 0.85rem;
+      border-radius: 20px; cursor: pointer;
+      font-size: 0.8rem; font-weight: 600;
+      border: 2px solid transparent;
+      transition: all 0.15s;
+      user-select: none;
+    }
+    .tl-pill.past { background: #ede9fe; color: #6d28d9; }
+    .tl-pill.current { background: #7c3aed; color: white; box-shadow: 0 2px 8px rgba(124,58,237,0.4); }
+    .tl-pill.future { background: #f3f0ff; color: #bbb; }
+    .tl-pill.active { outline: 2px solid #7c3aed; outline-offset: 2px; }
+    .tl-pill:hover { transform: translateY(-1px); }
+
+    .tl-panel {
+      margin-top: 1rem;
+      padding: 1.25rem;
+      background: #f9f7ff;
+      border-radius: 12px;
+      display: flex; gap: 1.25rem; align-items: flex-start;
+    }
+    .tl-panel-img {
+      width: 120px; height: 120px; flex-shrink: 0;
+      border-radius: 10px; object-fit: cover;
+      box-shadow: 0 2px 8px rgba(76,29,149,0.15);
+    }
+    .tl-panel-img-placeholder {
+      width: 120px; height: 120px; flex-shrink: 0;
+      border-radius: 10px;
+      background: #ede9fe;
+      display: flex; align-items: center; justify-content: center;
+      color: #c4b5fd; font-size: 2rem; font-weight: 800;
+    }
+    .tl-panel-body { flex: 1; }
+    .tl-panel-header { display: flex; align-items: baseline; gap: 0.6rem; margin-bottom: 0.5rem; }
+    .tl-panel-lv { font-size: 1.5rem; font-weight: 800; color: #7c3aed; }
+    .tl-panel-name { font-size: 1.1rem; font-weight: 700; }
+    .tl-panel-badge {
+      font-size: 0.7rem; font-weight: 700; padding: 0.15rem 0.5rem;
+      border-radius: 20px; background: #7c3aed; color: white;
+      margin-left: 0.25rem;
+    }
+    .tl-panel-badge.future-badge { background: #e5e7eb; color: #9ca3af; }
+    .tl-panel-desc { font-size: 0.85rem; color: #6b7280; margin-bottom: 0.6rem; line-height: 1.55; }
+    .tl-panel-evidence { font-size: 0.88rem; color: #374151; line-height: 1.65; }
+
+    /* ── User Achievement Box ── */
+    .user-achievement {
+      margin-top: 0.75rem; padding: 0.7rem 0.9rem;
+      background: #ede9fe; border-radius: 8px;
+      border-left: 3px solid #7c3aed;
+    }
+    .user-achievement-label {
+      font-size: 0.68rem; font-weight: 700; color: #7c3aed;
+      text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 0.3rem;
+    }
+    .user-achievement-text { font-size: 0.84rem; color: #374151; line-height: 1.6; }
+
+    /* ── Next steps ── */
+    .steps-list { list-style: none; display: flex; flex-direction: column; gap: 0.85rem; }
+    .steps-list li {
+      display: flex; gap: 0.75rem; align-items: flex-start;
+      font-size: 0.88rem; line-height: 1.55; color: #374151;
+    }
+    .step-icon {
+      min-width: 22px; height: 22px; border-radius: 50%;
+      background: #f3f0ff; color: #7c3aed;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 0.68rem; font-weight: 800; margin-top: 1px;
+    }
+
+    /* ── Projects ── */
+    .section-title {
+      font-size: 0.75rem; font-weight: 700; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 1rem;
+    }
+    .projects-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .project-card {
+      background: white; border-radius: 16px; padding: 1.25rem;
+      box-shadow: 0 1px 4px rgba(76,29,149,0.07);
+    }
+    .project-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.25rem; }
+    .project-name { font-size: 1rem; font-weight: 700; }
+    .project-open {
+      font-size: 0.72rem; color: #7c3aed; font-weight: 600;
+      text-decoration: none; padding: 0.2rem 0.55rem;
+      border: 1px solid #ede9fe; border-radius: 6px;
+      white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .project-open:hover { background: #ede9fe; }
+    .project-path {
+      font-size: 0.7rem; color: #bbb; font-family: monospace;
+      margin-bottom: 0.6rem; word-break: break-all;
+    }
+    .project-desc { font-size: 0.82rem; color: #6b7280; margin-bottom: 1rem; line-height: 1.5; }
+    .techniques { display: flex; flex-direction: column; gap: 0.45rem; }
+    .tech-row { display: flex; align-items: flex-start; gap: 0.55rem; }
+    .tag {
+      padding: 0.18rem 0.6rem; border-radius: 20px;
+      font-size: 0.7rem; font-weight: 700;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .tag-automation { background: #dbeafe; color: #1d4ed8; }
+    .tag-ai         { background: #ede9fe; color: #6d28d9; }
+    .tag-infra      { background: #d1fae5; color: #065f46; }
+    .tag-frontend   { background: #fef3c7; color: #92400e; }
+    .tag-prompt     { background: #fce7f3; color: #9d174d; }
+    .tech-use { font-size: 0.78rem; color: #6b7280; line-height: 1.4; padding-top: 0.1rem; }
+
+    /* ── Project detail panel ── */
+    .project-detail-toggle {
+      margin-top: 0.9rem;
+      width: 100%; padding: 0.4rem 0;
+      background: #f3f0ff; color: #6d28d9;
+      border: none; border-radius: 8px;
+      font-size: 0.78rem; font-weight: 600;
+      cursor: pointer; transition: background 0.15s;
+    }
+    .project-detail-toggle:hover { background: #ede9fe; }
+    .project-detail-panel {
+      display: none; margin-top: 0.85rem;
+      border-top: 1px solid #ede9fe; padding-top: 0.85rem;
+    }
+    .project-detail-panel.open { display: block; }
+    .detail-workflow {
+      font-size: 0.78rem; color: #6d28d9; font-weight: 600;
+      background: #f3f0ff; border-radius: 8px;
+      padding: 0.55rem 0.75rem; margin-bottom: 0.85rem;
+      line-height: 1.5;
+    }
+    .detail-section { margin-bottom: 0.75rem; }
+    .detail-section-title {
+      font-size: 0.75rem; font-weight: 700; color: #374151;
+      margin-bottom: 0.35rem; letter-spacing: 0.02em;
+    }
+    .detail-section-list {
+      list-style: none; display: flex; flex-direction: column; gap: 0.3rem;
+    }
+    .detail-section-list li {
+      font-size: 0.76rem; color: #6b7280; line-height: 1.5;
+      padding-left: 0.85rem; position: relative;
+    }
+    .detail-section-list li::before {
+      content: "·"; position: absolute; left: 0;
+      color: #c4b5fd; font-weight: 900;
+    }
+
+    /* ── Level Progress Overview ── */
+    .lp-row { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.65rem; }
+    .lp-label { font-size: 0.8rem; font-weight: 700; color: #374151; min-width: 130px; flex-shrink: 0; }
+    .lp-bar { flex: 1; height: 10px; background: #f3f0ff; border-radius: 5px; overflow: hidden; }
+    .lp-bar-fill { height: 100%; border-radius: 5px; transition: width 1s ease; }
+    .lp-bar-fill.lp-past    { background: #c4b5fd; }
+    .lp-bar-fill.lp-current { background: linear-gradient(90deg, #c4b5fd, #7c3aed); }
+    .lp-bar-fill.lp-future  { background: #ddd6fe; }
+    .lp-pct { font-size: 0.8rem; font-weight: 700; color: #7c3aed; min-width: 38px; text-align: right; flex-shrink: 0; }
+    .lp-status { font-size: 0.68rem; padding: 0.1rem 0.45rem; border-radius: 10px; font-weight: 700; flex-shrink: 0; }
+    .lp-status-done    { background: #d1fae5; color: #065f46; }
+    .lp-status-current { background: #ede9fe; color: #6d28d9; }
+    .lp-status-future  { background: #f3f4f6; color: #9ca3af; }
+
+    /* ── Criteria checklist in timeline panel ── */
+    .criteria-header { display: flex; justify-content: space-between; align-items: center; margin-top: 0.85rem; margin-bottom: 0.45rem; }
+    .criteria-header-label { font-size: 0.74rem; font-weight: 700; color: #374151; text-transform: uppercase; letter-spacing: 0.06em; }
+    .criteria-pct { font-size: 0.95rem; font-weight: 800; color: #7c3aed; }
+    .criteria-track { height: 7px; background: #f3f0ff; border-radius: 4px; overflow: hidden; margin-bottom: 0.7rem; }
+    .criteria-fill { height: 100%; background: linear-gradient(90deg, #c4b5fd, #7c3aed); border-radius: 4px; transition: width 0.8s ease; }
+    .criteria-list { display: flex; flex-direction: column; gap: 0.4rem; }
+    .criterion-item { display: flex; align-items: flex-start; gap: 0.55rem; }
+    .criterion-dot { min-width: 17px; height: 17px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.6rem; font-weight: 900; margin-top: 2px; flex-shrink: 0; }
+    .criterion-done    .criterion-dot { background: #059669; color: white; }
+    .criterion-partial .criterion-dot { background: #d97706; color: white; }
+    .criterion-not     .criterion-dot { background: #fee2e2; color: #dc2626; border: 1.5px solid #fca5a5; }
+    .criterion-done    .criterion-text { font-size: 0.82rem; color: #374151; line-height: 1.5; }
+    .criterion-partial .criterion-text { font-size: 0.82rem; color: #6b7280; line-height: 1.5; }
+    .criterion-not     .criterion-text { font-size: 0.82rem; color: #dc2626; line-height: 1.5; }
+
+    /* ── Skills section ── */
+    .skills-grid {
+      display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.75rem;
+    }
+    .skill-card {
+      background: #f9f7ff; border-radius: 10px; padding: 0.85rem 1rem;
+      border-left: 3px solid #c4b5fd;
+      display: flex; flex-direction: column; gap: 0.3rem;
+    }
+    .skill-cat-workflow  { border-color: #7c3aed; }
+    .skill-cat-debug     { border-color: #dc2626; }
+    .skill-cat-memory    { border-color: #d97706; }
+    .skill-cat-infra     { border-color: #059669; }
+    .skill-cat-data      { border-color: #0891b2; }
+    .skill-cat-frontend  { border-color: #f59e0b; }
+    .skill-header { display: flex; align-items: center; gap: 0.55rem; flex-wrap: wrap; }
+    .skill-name { font-size: 0.88rem; font-weight: 700; font-family: monospace; color: #1d1d1f; }
+    .skill-invoke {
+      font-size: 0.72rem; font-family: monospace;
+      background: #ede9fe; color: #6d28d9;
+      padding: 0.1rem 0.45rem; border-radius: 4px;
+    }
+    .skill-desc { font-size: 0.8rem; color: #374151; line-height: 1.5; }
+    .skill-trigger { font-size: 0.74rem; color: #9ca3af; }
+
+    /* ── Skill origin badge ── */
+    .origin-badge {
+      font-size: 0.65rem; font-weight: 700;
+      padding: 0.1rem 0.45rem; border-radius: 10px;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .origin-self    { background: #d1fae5; color: #065f46; }
+    .origin-global  { background: #dbeafe; color: #1d4ed8; }
+    .origin-project { background: #fef3c7; color: #92400e; }
+
+    /* ── Skill tip ── */
+    .skill-tip {
+      font-size: 0.73rem; color: #7c3aed;
+      background: #f5f3ff; border-radius: 6px;
+      padding: 0.25rem 0.55rem; margin-top: 0.15rem;
+      line-height: 1.5;
+    }
+    .skill-tip::before { content: "💡 "; }
+
+    /* ── Dim improve hint ── */
+    .dim-improve {
+      font-size: 0.73rem; color: #6b7280;
+      margin-top: 0.35rem; line-height: 1.5;
+      padding-left: 0.1rem;
+    }
+    .dim-improve::before { content: "→ "; color: #c4b5fd; font-weight: 700; }
+
+    /* ── Unused Tools section ── */
+    .unused-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.85rem;
+    }
+    .unused-card {
+      background: white; border-radius: 12px; padding: 1rem 1.1rem;
+      box-shadow: 0 1px 3px rgba(76,29,149,0.06);
+      border-top: 3px solid #e5e7eb;
+    }
+    .unused-cat-automation { border-color: #93c5fd; }
+    .unused-cat-infra      { border-color: #6ee7b7; }
+    .unused-cat-frontend   { border-color: #fcd34d; }
+    .unused-cat-ai         { border-color: #c4b5fd; }
+    .unused-header { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem; }
+    .unused-name { font-size: 0.92rem; font-weight: 700; }
+    .unused-desc { font-size: 0.78rem; color: #6b7280; line-height: 1.55; }
+    .tool-priority-now {
+      font-size: 0.65rem; font-weight: 700;
+      padding: 0.1rem 0.45rem; border-radius: 10px;
+      background: #fef3c7; color: #92400e;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .tool-priority-next {
+      font-size: 0.65rem; font-weight: 700;
+      padding: 0.1rem 0.45rem; border-radius: 10px;
+      background: #f3f4f6; color: #9ca3af;
+      white-space: nowrap; flex-shrink: 0;
+    }
+
+    /* ── Achievement Log ── */
+    .log-form { display: flex; gap: 0.6rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .log-input-date {
+      padding: 0.4rem 0.65rem; border: 1px solid #e8e0f5; border-radius: 8px;
+      font-size: 0.82rem; color: #374151; background: #faf8ff;
+      flex-shrink: 0;
+    }
+    .log-input-text {
+      flex: 1; min-width: 180px; padding: 0.4rem 0.65rem;
+      border: 1px solid #e8e0f5; border-radius: 8px;
+      font-size: 0.82rem; color: #374151; background: #faf8ff;
+      font-family: inherit;
+    }
+    .log-input-text:focus, .log-input-date:focus { outline: none; border-color: #c4b5fd; }
+    .log-btn {
+      padding: 0.4rem 1rem; background: #7c3aed; color: white;
+      border: none; border-radius: 8px; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; white-space: nowrap;
+    }
+    .log-btn:hover { background: #6d28d9; }
+    .log-list { display: flex; flex-direction: column; gap: 0.5rem; }
+    .log-entry {
+      display: flex; align-items: flex-start; gap: 0.75rem;
+      padding: 0.65rem 0.9rem; background: #f9f7ff;
+      border-radius: 10px; border-left: 3px solid #c4b5fd;
+    }
+    .log-date { font-size: 0.72rem; color: #9ca3af; white-space: nowrap; flex-shrink: 0; padding-top: 0.1rem; }
+    .log-text { font-size: 0.84rem; color: #374151; line-height: 1.55; flex: 1; }
+    .log-del {
+      background: none; border: none; color: #d1d5db; cursor: pointer;
+      font-size: 0.9rem; line-height: 1; flex-shrink: 0; padding: 0.1rem 0.2rem;
+    }
+    .log-del:hover { color: #dc2626; }
+    .log-empty { font-size: 0.82rem; color: #bbb; text-align: center; padding: 1rem 0; }
+
+    @media (max-width: 900px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .projects-grid, .skills-grid, .unused-grid { grid-template-columns: 1fr; }
+      .header, .progress-section, .main { padding-left: 1.5rem; padding-right: 1.5rem; }
+      .tl-panel { flex-direction: column; }
+      .tl-panel-img, .tl-panel-img-placeholder { width: 100%; height: 160px; }
+    }
+  </style>
+</head>
+<body>
+
+<script>
+// ════════════════════════════════════════════════════
+//  DATA — Claude Code 自动维护此区块
+// ════════════════════════════════════════════════════
+const DATA = {
+  lastUpdated: "2026-05-14",
+  assessment: {
+    level: 5,
+    dimensions: {
+      control: 6,   // 可控性：CLAUDE.md 配置扎实，但模板库/知识库缺失
+      breadth: 7,   // 广度：跨领域（运营→编程→教育工具→自动化运维）
+      form:    6,   // 形态：Claude Code Agent 自主执行，但仍较依赖引导
+      role:    7    // 角色：SIE 工具交付 6 人使用，但尚未设计面向更广受众的产品
+    }
+  },
+  levelNames: [
+    "旁观者", "尝鲜者", "对话者", "驯化师", "越境者",
+    "织网者", "召唤师", "铸造师", "造物主", "觉醒者", "一人军团"
+  ],
+  levelDescs: [
+    "知道 AI 但从未使用",
+    "初识 AI · 好奇探索 · 简单提问",
+    "清晰提问 · 有效沟通 · 掌控对话",
+    "设定规则 · 驱动智能 · 共创卓越",
+    "AI 助你跨越边界，能力全面进化",
+    "AI 已深度融入生活，与你共创无限可能",
+    "从 ChatBot 到 Agent · 工具调用 · 自主执行",
+    "封装 Skill · 反馈循环 · 基础设施",
+    "技术创造 × 艺术创造 · 双线开花",
+    "人机共生 · AI 成为思维方式",
+    "一人即系统 · 一人对标团队"
+  ],
+  // 每级达成证据。userAchievements = 你具体做了什么才到这级（null = 尚未到达或起点）
+  levelEvidence: [
+    {
+      img: "images/lv00.jpg",
+      text: "知道 AI 的存在，但还没有动手用过。AI 对你来说是遥远的科技新闻或名词，还没有产生任何实际交集。",
+      userAchievements: null
+    },
+    {
+      img: "images/lv01.webp",
+      text: "第一次打开 ChatGPT 或其他 AI 工具，充满好奇地问了第一个问题。AI 给什么就用什么，不会追问，不会引导，但这个开始是一切的起点。",
+      userAchievements: "第一次打开 ChatGPT / Claude，用 AI 草拟邮件、查询信息、回答日常工作问题。从「听说过」到「真的用了」——这步虽小，却是一切的起点。"
+    },
+    {
+      img: "images/lv02.webp",
+      text: "掌握了有效提问的核心：明确目标、提供上下文、指定角色、设定格式、补充示例。从「随便问问」升级为「有目的地对话」，能让 AI 输出你真正想要的内容。",
+      userAchievements: "开始有意识地设定角色、提供背景信息、指定输出格式。「我是 Futu 客服运营，帮我把这条投诉整理成结构化报告」——从随便问问，变成了精准提问。"
+    },
+    {
+      img: "images/lv03.webp",
+      text: "开始主动约束 AI：要求来源可验证、结构清晰、步骤化任务拆分。会上传文件、给例子、统一格式。AI 不再是随机作答，而是在你设定的规则下高质量输出。",
+      userAchievements: "为工作任务设计专用 Prompt：要求 AI 按固定结构输出、分步拆解、风格统一。上传工单记录作为参考，AI 开始在你定义的规则下稳定产出，而不是随机发挥。",
+      criteria: [
+        { text: "为工作任务设计专用 Prompt，要求固定结构、步骤化输出、风格统一", status: "done" },
+        { text: "上传文件/例子作为参考，让 AI 在你定义的规则下输出", status: "done" },
+        { text: "要求 AI 分步骤拆解任务，逐步执行而不是一次给出所有答案", status: "done" },
+        { text: "建立可复用的 Prompt 模板，相同类型任务不需要每次重写", status: "done" }
+      ]
+    },
+    {
+      img: "images/lv04.webp",
+      text: "借助 AI 跨入自己专业以外的领域——编程开发、设计创作、学术研究、内容创作、商业运营。本来做不到的事，现在能做了。能力边界被 AI 大幅扩张，不再被职业标签束缚。",
+      userAchievements: "关键突破：运营背景、零编程基础，借助 AI 独立写出第一个 Playwright 网页爬虫，成功抓取 Futu OA 内网报表数据。「这是开发该做的事」的边界，第一次被打破。",
+      criteria: [
+        { text: "借助 AI 完成自己专业之外的任务（编程、设计、研究等）", status: "done" },
+        { text: "独立写出第一个编程脚本（Playwright 爬虫），涉及 DOM 选择器、异步逻辑、数据存储", status: "done" },
+        { text: "构建完整的后端项目（Scheduler + API + 数据存储），而不只是孤立脚本", status: "done" },
+        { text: "将 AI 辅助开发的产品交付给真实用户使用", status: "done" }
+      ]
+    },
+    {
+      img: "images/lv05.webp",
+      text: "AI 不再是偶尔用的工具，而是每日工作流的一部分。有自己的 Prompt 模板库、项目中心、知识库、记忆系统。今天要做什么，AI 是你的协作伙伴，从流程优化到深度研究全覆盖。",
+      userAchievements: "安装 Claude Code，为报表自动化、S7 备考工具等多个项目分别配置 CLAUDE.md。AI 不再是偶尔打开的工具，而是每天开电脑都在跑的基础设施，工作流真正被 AI 化。",
+      criteria: [
+        { text: "安装并每天使用 Claude Code 作为主力开发工具", status: "done" },
+        { text: "多个项目分别配置 CLAUDE.md，建立项目级 AI 上下文", status: "done" },
+        { text: "配置跨会话记忆系统，AI 能记住偏好和历史背景（目前为 Claude Code 自动维护）", status: "done" },
+        { text: "AI 工具覆盖工作流多个环节（开发 + 自动化 + 内容处理）", status: "done" },
+        { text: "建立 Prompt 模板库：常用场景 Prompt 分类整理，可直接复用（至少 5 类）", status: "not" },
+        { text: "建立知识库：把常用文档/API 规范/字段说明放在 AI 可引用的结构化位置（报表项目已有 GOTCHAS.md + references/ 4 个文档；其他项目待扩展）", status: "partial" }
+      ]
+    },
+    {
+      img: "images/lv06.webp",
+      text: "跨越了 ChatBot → Agent 的分水岭。AI 开始调用真实工具——搜索引擎、Python 计算、数据库、API、文件系统。能执行多步任务链，自主完成从信息收集到报告生成的完整流程。",
+      userAchievements: "Claude Code 开始自主操作：读写文件、执行 Python 脚本、调试 Playwright 爬虫、调用 Feishu API 推送消息。不再是「你问我答」，而是「你说目标，AI 自己跑完整个流程」。",
+      criteria: [
+        { text: "AI 能调用真实 API（Feishu / Supabase），发送实际消息或写入数据库", status: "done" },
+        { text: "AI 能自主执行多步任务链（读取→处理→分析→推送），全程无需手动操作", status: "done" },
+        { text: "Playwright 爬虫自主定时运行（触发→抓取→存储），AI 驱动完整流程", status: "done" },
+        { text: "构建从数据采集到报告推送的完整自动化管道，无人值守运行", status: "done" },
+        { text: "Agent 遇到错误时能自主恢复（如认证过期自动重登），不停下来等待人工介入", status: "partial" },
+        { text: "无需每次详细说明上下文，AI 能在项目内持续推进任务，减少引导依赖", status: "partial" }
+      ]
+    },
+    {
+      img: "images/lv07.webp",
+      text: "开始构建属于自己的 AI 基础设施：封装可复用的 Skill，设计自动化工作流，建立记忆系统和知识库。最关键的是构建了反馈循环——AI 生成 → 评审 → 反馈 → 迭代 → 优化，系统持续进化。",
+      userAchievements: "当前阶段：封装 15 个全局 Skill（plan-first / task-verify 等）、配置跨会话记忆系统、构建 AI 分析工单 → 飞书日报的完整反馈闭环，并将 SIE 工具交付给 6 名真实用户使用。",
+      criteria: [
+        { text: "封装多个全局 Skill（plan-first / task-verify / report-qa 等），在所有项目中通用", status: "done" },
+        { text: "设计并交付了供他人使用的 AI 产品（SIE 工具，6 名用户）", status: "done" },
+        { text: "配置记忆系统，AI 跨会话保留上下文（但主要由 Claude Code 自动维护）", status: "partial" },
+        { text: "构建了 AI 分析→日报推送的闭环，但人工仍参与质检，未完全自动迭代", status: "partial" },
+        { text: "建立 AI 反馈迭代系统：AI 产出→自动评审→优化→再迭代，形成自我演进闭环", status: "partial" },
+        { text: "构建个人 Prompt 模板库 / Skill 库，沉淀为可复用的 AI 基础设施", status: "partial" }
+      ]
+    },
+    {
+      img: "images/lv08.webp",
+      text: "技术与艺术双线并进。能驱动多个 Agent 协同创造——代码助手、测试助手、架构助手、文案助手、绘画助手、剪辑助手各司其职。从软件产品到创意内容，全都能独立交付。",
+      userAchievements: null,
+      criteria: [
+        { text: "驱动多个 Agent 协同工作（代码/测试/文案 Agent 各司其职，一起完成任务）", status: "not" },
+        { text: "独立完成一个有设计感的软件产品（UI/UX 超出功能工具水平）", status: "not" },
+        { text: "使用 AI 辅助创意创作（图像生成、视频、设计等），完成有审美的内容产出", status: "not" },
+        { text: "从「零想法」到「可交付产品」全流程，技术与创意双线并进，独立完成", status: "not" }
+      ]
+    },
+    {
+      img: "images/lv09.webp",
+      text: "AI 不只是工具，已经成为你的思维方式。用第一性原理拆解问题，用结构化思维建立系统模型，用 AI 进行数据洞察和模式识别。人机共生，AI 是你的第二大脑，协作不再需要刻意切换。",
+      userAchievements: null,
+      criteria: [
+        { text: "用第一性原理拆解复杂问题，AI 作为思维伙伴深度参与推理（而非只执行任务）", status: "not" },
+        { text: "用 AI 建立个人知识系统（读书笔记→洞察→知识图谱），形成可检索的第二大脑", status: "not" },
+        { text: "AI 无缝融入日常决策，不需要「切换模式」才能用（像用搜索引擎一样自然）", status: "not" },
+        { text: "主动向 AI 提出假设、让 AI 反驳测试，用 AI 强化批判性思维", status: "not" }
+      ]
+    },
+    {
+      img: "images/lv10.webp",
+      text: "一个人，但有一支完整的 AI 团队在运转：内容、研究、营销、运营、产品、分析、设计、决策——每个职能都有对应的 AI 助理。你是指挥官，AI 是执行系统。一人产出对标几十人团队的质量和速度。",
+      userAchievements: null,
+      criteria: [
+        { text: "有完整的 AI 助理团队（内容/研究/运营/产品/分析，每个职能有独立配置）", status: "not" },
+        { text: "独立完成本需要 3–5 人团队才能交付的项目", status: "not" },
+        { text: "收入或影响力可明确归因于 AI 赋能（被外部量化认可）", status: "not" },
+        { text: "能指导他人建立自己的 AI 工作流（知识可输出，不只是自用）", status: "not" }
+      ]
+    }
+  ],
+  // 为什么是 Lv.5 的关键证据
+  whyEvidence: [
+    { label: "AI 深度融入工作流", detail: "Claude Code 每天运行，多项目并行——AI 不是偶尔打开的工具，是开电脑就在跑的基础设施" },
+    { label: "Agent 级项目配置", detail: "3 个项目各有独立 CLAUDE.md，Claude Code 作为 Agent 在项目内持续工作" },
+    { label: "AI 驱动的完整流程", detail: "Playwright 抓取→AI 分析不满意工单→飞书日报推送，Claude Code 自主执行端到端" },
+    { label: "跨领域能力扩张", detail: "运营背景，独立交付了 Playwright 爬虫 + Python 调度 + Flask 看板 + 前端工具" }
+  ],
+  nextSteps: [
+    "建立 Prompt 模板库：把常用场景（工单分析 / 周报撰写 / 代码调试等）的 Prompt 整理成文件，相同任务不每次重写",
+    "建立知识库（部分完成）：报表项目已有 GOTCHAS.md（3 条已知陷阱）+ references/ 4 个结构化文档；下一步把同类文档扩展到 S7、SIE 等其他项目",
+    "解决 Agent 自主恢复问题：认证过期时让爬虫自动触发重登，而不是停下来等人工介入",
+    "减少 AI 引导依赖：练习只说目标不说步骤，观察 AI 能自主推进多少个决策"
+  ],
+  projects: [
+    {
+      name: "报表自动化",
+      path: "C:\\Users\\45410\\Work\\report-automation",
+      desc: "Futu OA 内网报表定时抓取、AI 分析不满意工单、自动推送飞书日报；支持一键生成静态报表发布到 GitHub Pages",
+      techniques: [
+        { name: "Playwright",         cat: "automation", use: "自动爬取 Futu OA 内网报表数据" },
+        { name: "Python Scheduler",   cat: "automation", use: "定时触发抓取与推送任务" },
+        { name: "Claude API",         cat: "ai",         use: "不满意工单 AI 深度分析（根因四分类）" },
+        { name: "Feishu API",         cat: "infra",      use: "自动推送日报/周报到飞书" },
+        { name: "Flask",              cat: "infra",      use: "本地 Web 查看历史报表" },
+        { name: "GitHub Pages",       cat: "infra",      use: "静态报表公开发布（futu-report 仓库），支持分享链接" },
+        { name: "Prompt Engineering", cat: "prompt",     use: "设计工单分析 Prompt，控制输出格式" },
+        { name: "CLAUDE.md",          cat: "prompt",     use: "项目级 AI 助理配置与上下文管理" }
+      ],
+      details: {
+        workflow: "Futu OA 内网 → Playwright 定时抓取（16:00 MYT）→ JSON 存储 → Flask 看板展示 → AI 分析不满意工单 → 飞书推送日报（16:30 MYT）；另支持 /generate-report 生成静态 HTML+MD 发布到 GitHub Pages",
+        sections: [
+          {
+            title: "Claude API 配置",
+            items: [
+              "模型：claude-sonnet-4-5，通过企业代理 ai.futuoa.com/v1 调用（key: user-key-G0TNKCb1VKX84L6G）",
+              "功能：不满意工单逐条分析，输出 JSON：short_label / root_cause / root_cause_summary / push_action / has_agent_issue / suggestions",
+              "同时用于处理时长、通话时长、一次解决率、满意度等多维度周期性分析"
+            ]
+          },
+          {
+            title: "不满意工单 Prompt 设计（四分类 root_cause）",
+            items: [
+              "product_flow：产品功能限制或流程时效问题（平台本身做不到）",
+              "rule_limit：合规/监管规则限制，非公司可控——强制规则：出金延迟/账户冻结/活动奖励延迟一律归此类，即使同时存在客服问题",
+              "agent_issue：客服直接过失（错误信息、态度恶劣、流程操作失误）",
+              "mixed：产品/流程是根本原因，但客服处理有明显可改善空间",
+              "特殊规则：「承诺未兑现」默认不标记 has_agent_issue，避免误判",
+              "agent_handled_well = true 需同时满足：①主动解释原因 ②提供替代方案 ③有温度地回应情绪"
+            ]
+          },
+          {
+            title: "飞书推送配置",
+            items: [
+              "App ID: cli_a955d0abdca39bcb，App Secret 换取 access_token 后调用消息 API",
+              "推送目标：群聊 chat_id = oc_0805887322416489794c2bf3ad578fe6（日报群）",
+              "消息格式：飞书卡片（interactive card），内含各指标数值 + 颜色标注（超/未达标）",
+              "调度：Python schedule 库，16:00 MYT 抓取，16:30 MYT 推送"
+            ]
+          },
+          {
+            title: "CLAUDE.md 配置",
+            items: [
+              "包含项目结构说明（各 .py 文件职责：scraper / scheduler / feishu_push / ai_analyze 等）",
+              "数据 JSON 格式规范（reports.json / weekly_reports.json / dissatisfied_analysis.json 等字段说明）",
+              "API 配置说明、Threshold 阈值定义、常见排错步骤",
+              "帮助 Claude Code 在新会话中无需重复解释项目背景即可直接继续开发"
+            ]
+          },
+          {
+            title: "静态报表发布（GitHub Pages）",
+            items: [
+              "generate_static.py：从本地 Flask 拉取全量数据，注入 fetch 拦截器生成自包含 HTML，同时生成 Markdown 摘要",
+              "HTML 用于人类浏览（含图表、AI 分析），Markdown 供 Claude 等 AI 直接读取数据",
+              "通过 gh CLI 推送到 Jean-Jia/futu-report 仓库，目录结构：reports/daily/ weekly/ monthly/",
+              "Pages 链接：jean-jia.github.io/futu-report；URL 参数 ?tab=monthly&month=2026-04-01 自动定位到对应报表",
+              "Skill /generate-report 支持中英文触发：「生成四月月报」/ generate report monthly 2026-04"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      name: "静态报表设计稿",
+      path: "C:\\Users\\45410\\Work\\csat-report-demo.html / ops-report-demo.html",
+      desc: "两份高设计感静态报表：CSAT 满意度双周报（editorial 印刷风）+ CA 运营月报（暗色 mission control 风），由 /frontend-design 生成，可直接分享链接查看",
+      techniques: [
+        { name: "frontend-design", cat: "prompt",   use: "AI 根据内容语境自主选择设计方向，生成差异化 UI" },
+        { name: "纯前端 HTML",    cat: "frontend",  use: "自包含单文件，内嵌数据，无需服务器" },
+        { name: "GitHub Pages",   cat: "infra",     use: "通过 /generate-report 推送，可对外分享固定链接" }
+      ],
+      details: {
+        workflow: "本地 Flask 数据 → generate_static.py 注入 → 生成自包含 HTML → /frontend-design 重设计 → GitHub Pages 发布",
+        sections: [
+          {
+            title: "csat-report-demo.html — CSAT 满意度双周报",
+            items: [
+              "设计风格：editorial 印刷风，Cormorant Garamond + Syne 字体，#1a3d2e 深绿色调",
+              "内容：满意度趋势、分渠道拆解、客服表现亮点与改进项",
+              "定位：供管理层/客服团队传阅，重在可读性与信息密度"
+            ]
+          },
+          {
+            title: "ops-report-demo.html — CA 运营月报",
+            items: [
+              "设计风格：暗色 mission control，Barlow Condensed + Hanken Grotesk 字体，深海蓝背景",
+              "内容：在线咨询量、处理时长、一次解决率、满意度等核心指标月度趋势",
+              "定位：运营数据看板风格，数字优先、密度高"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      name: "S7 备考工具",
+      path: "C:\\Users\\45410\\Work\\s7-exam-tool",
+      desc: "Series 7 证券考试备考，AI 问答 + 题库练习，个人使用",
+      techniques: [
+        { name: "纯前端 HTML",    cat: "frontend", use: "单文件应用，无需服务器，双击即用" },
+        { name: "localStorage",   cat: "frontend", use: "在本机浏览器中保存学习进度，下次打开自动恢复（仅限本设备）" },
+        { name: "Claude API",     cat: "ai",       use: "内嵌 AI 问答，实时解答考题" },
+        { name: "CLAUDE.md",      cat: "prompt",   use: "项目级配置" }
+      ],
+      details: {
+        workflow: "本地 HTML 文件 → 浏览器打开 → 章节选择 / 题目练习 → localStorage 存进度 → Claude API 实时解答",
+        sections: [
+          {
+            title: "单文件架构",
+            items: [
+              "整个工具就是一个 index.html，无需安装，双击即用",
+              "题库内嵌在 JS 数组中，离线也能做题",
+              "localStorage 保存学习进度，关闭重开浏览器自动恢复（仅限本设备）"
+            ]
+          },
+          {
+            title: "Claude API 集成（AI 问答）",
+            items: [
+              "用户遇到不懂的题目可直接问 AI，API key 写在 HTML 里",
+              "Prompt 提供题目内容 + 题目分类，要求 AI 用考试角度解释正确答案的底层逻辑",
+              "纯个人使用，不涉及多用户或云端，设计极简"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      name: "SIE 备考追踪",
+      path: "C:\\Users\\45410\\Work\\SIE考试工具",
+      desc: "6 名员工 SIE 考试进度管理，打卡系统 + 管理员视图 + GitHub Actions 自动飞书通知",
+      techniques: [
+        { name: "纯前端 HTML",    cat: "frontend",  use: "单文件多用户应用，GitHub Pages 部署" },
+        { name: "Supabase",       cat: "infra",      use: "云端 PostgreSQL 数据库，打卡记录实时同步，换设备不丢数据" },
+        { name: "GitHub Pages",   cat: "infra",      use: "部署到 GitHub Pages，6 人随时访问固定链接，无需安装任何东西" },
+        { name: "GitHub Actions", cat: "automation", use: "4 个自动 workflow：早提醒 09:03、晚催促 21:07、落后提醒、周一&周五周报——不需要电脑开机" },
+        { name: "Feishu Webhook", cat: "infra",      use: "管理员手动触发 + GitHub Actions 自动触发，群通知 + 个人私信催促" },
+        { name: "CLAUDE.md",      cat: "prompt",     use: "项目级配置" }
+      ],
+      details: {
+        workflow: "用户 → GitHub Pages 访问 → 打卡/选章节 → Supabase 云端存储 → GitHub Actions 定时读取 → 飞书通知",
+        sections: [
+          {
+            title: "Supabase 云端数据库",
+            items: [
+              "项目 URL：cupdvksfzqpjedibajus.supabase.co（PostgreSQL）",
+              "anon key 存入 GitHub Secrets，GitHub Actions 通过 REST API 读写数据",
+              "打卡记录实时同步，6 人可在不同设备上访问各自数据，换设备不丢记录"
+            ]
+          },
+          {
+            title: "GitHub Actions 自动通知（4 个 workflow）",
+            items: [
+              "daily-morning.yml：cron '3 1 * * *'（09:03 MYT）每天早上发今日提醒",
+              "daily-evening.yml：cron '7 13 * * *'（21:07 MYT）催促当天未打卡用户",
+              "behind-alert.yml：连续 3 天未打卡时触发落后催促",
+              "weekly-report.yml：cron '32 1 * * 1,5'（周一&周五 09:32 MYT）发全员进度周报"
+            ]
+          },
+          {
+            title: "飞书通知配置",
+            items: [
+              "群 Webhook：发进度周报和全员催促（在管理员设置页配置）",
+              "个人 Webhook：为每人配置单独链接，发私信催促",
+              "GitHub Actions 调用 .github/scripts/notify.py 读取 Supabase 数据后触发 Webhook"
+            ]
+          },
+          {
+            title: "多用户设计",
+            items: [
+              "7 个账号（6名员工 + 管理员 jeanjia），下拉选择登录，无需密码",
+              "管理员视图：所有人进度总览表，点击任意用户查看完整打卡记录",
+              "每用户：章节进度追踪（20章）+ 每日打卡 + 连续天数 + 进度 vs 计划对比"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  // ── Claude Code 全局 Skills（位于 ~/.claude/skills/）────────────────────
+  skills: [
+    // ── 自封装 ──────────────────────────────────────────────────────────────
+    {
+      name: "report-qa",
+      origin: "self",
+      cat: "data",
+      desc: "对报表自动化所有数据文件运行完整 QA。检查项：①数值合理性（接通率 0–100%、处理时长 0–60min 等）②AI 分析完整性（每条不满意工单有无 root_cause/push_action/suggestions）③环比突变（日环比 >20% 标⚠️）④缺失日期（抓取失败的空洞）。输出格式：每个文件一个区块，✅ 正常 / ❌ 异常 / ⚠️ 需关注，附修复 API 端点（如重跑分析：POST /api/daily/analyze-handle，重跑满意度：POST /api/weekly/analyze-satis）",
+      trigger: "手动调用（每次抓取完成后、或飞书日报推送前核查数据质量时）",
+      tip: "推送飞书日报前先跑一次，可捕获抓取失败或数值异常，避免推送错误数据到群里",
+      invoke: "/report-qa"
+    },
+    {
+      name: "generate-report",
+      origin: "self",
+      cat: "data",
+      desc: "将本地 Flask 报表一键生成静态 HTML + Markdown 并推送到 GitHub Pages（jean-jia.github.io/futu-report），返回两个链接：可视化链接供人浏览，Markdown 链接供 Claude 读取分析。支持日报 / 周报 / 月报三种类型",
+      trigger: "说「生成X月月报」「生成本周周报」「生成今天日报」或英文「generate report [monthly|weekly|daily] [period]」时触发",
+      tip: "生成后 Markdown 链接立即可用；GitHub Pages 可视化链接约 1-3 分钟后生效",
+      invoke: "/generate-report"
+    },
+    {
+      name: "push-daily",
+      origin: "self",
+      cat: "data",
+      desc: "手动推送指定日期的日报到飞书群。全流程约 2 分钟：向索引云文档追加条目、发日报卡片（含索引+直链按钮）、学习委员分析、CC 激励话语",
+      trigger: "说「推日报 YYYY-MM-DD」「发群里日报」「推送X月X号的数据」时触发",
+      tip: "遇到 WinError 10054（连接重置）直接重试一次即可；推送历史日期时卡片标题显示「X月X日（周X）」而非「昨日」",
+      invoke: "/push-daily"
+    },
+    {
+      name: "update-ai-growth",
+      origin: "self",
+      cat: "memory",
+      desc: "同步更新 AI 成长仪表板（dashboard.html）。安装新 skill、新建项目、用到新技术、升级标准变化时自动触发，保持 dashboard 与实际 AI 使用进度一致",
+      trigger: "自动：安装新 skill / 新建项目 / 某升级标准完成时触发；手动说「更新 AI growth」或 /update-ai-growth",
+      tip: "这个 skill 本身也需要被自己记录——AI 基础设施自我维护的体现；skill 触发依赖 Claude 识别场景，偶尔会漏，发现漏了直接说",
+      invoke: "/update-ai-growth"
+    },
+    // ── 项目skill ────────────────────────────────────────────────────────────
+    {
+      name: "link-to-im",
+      origin: "project",
+      cat: "infra",
+      desc: "将 Claude Code 输出实时桥接到飞书/Telegram/Discord，在手机上看 AI 执行进度。子命令：start / stop / status / logs / doctor",
+      trigger: "手动或说「连上飞书」「消息推送」「启动桥接」时触发",
+      tip: "长任务（>10 分钟）时启动，手机实时收到进度推送，不用盯着电脑等结果",
+      invoke: "/link-to-im start"
+    },
+    // ── 全局skill ────────────────────────────────────────────────────────────
+    {
+      name: "plan-first",
+      origin: "global",
+      cat: "workflow",
+      desc: "收到新需求时，先列出完整执行计划等你确认，再动手。防止「做了一半才发现方向不对」",
+      trigger: "自动：说「帮我做」「实现」「添加」「修改」「重构」时触发",
+      tip: "复杂任务开始前调用一次，可省去反复返工的时间；简单的单步改动无需调用",
+      invoke: "/plan-first"
+    },
+    {
+      name: "task-verify",
+      origin: "global",
+      cat: "workflow",
+      desc: "声明「完成」前，逐项自检所有子需求是否全部满足。防止漏掉某个子任务就宣布完成",
+      trigger: "自动：即将说「完成」「done」时触发",
+      tip: "多需求并行时最有价值——避免做完第一个需求就宣布完成，忘了其余几个",
+      invoke: "/task-verify"
+    },
+    {
+      name: "progress-report",
+      origin: "global",
+      cat: "workflow",
+      desc: "多步骤长任务每完成一步主动汇报进度，不等你问。格式：[2/5] 步骤名 — 完成",
+      trigger: "自动：批量操作、循环处理多条记录时触发",
+      tip: "批量处理 10+ 条记录时最有帮助，防止长时间无输出时你不知道 AI 在干嘛",
+      invoke: "/progress-report"
+    },
+    {
+      name: "error-explain",
+      origin: "global",
+      cat: "debug",
+      desc: "遇到报错先解释根本原因（为什么出错），再给出解决方案。不直接跳去改代码",
+      trigger: "自动：工具报错、bash 失败、Python 抛异常时触发",
+      tip: "调试陌生错误时最有用；已知错误可以跳过解释，直接说「不用解释，直接修」",
+      invoke: "/error-explain"
+    },
+    {
+      name: "context-summary",
+      origin: "global",
+      cat: "memory",
+      desc: "整理当前对话，生成「完成了什么 / 未完成 / 下次需要知道的背景」结构化摘要，方便在新对话恢复上下文",
+      trigger: "手动调用",
+      tip: "会话即将结束前调用，保存断点；下次开会话直接说「继续」即可 5 分钟内恢复",
+      invoke: "/context-summary"
+    },
+    {
+      name: "project-init",
+      origin: "global",
+      cat: "workflow",
+      desc: "新建项目时自动创建标准文件夹结构 + CLAUDE.md 模板，确保项目有完整文档从第一天开始",
+      trigger: "说「新建项目」「创建项目」「初始化项目」时触发",
+      tip: "每个新项目的第一步调用，避免后期补文档——有 CLAUDE.md 的项目新会话可直接上手",
+      invoke: "/project-init"
+    },
+    {
+      name: "humanizer-zh",
+      origin: "global",
+      cat: "workflow",
+      desc: "消除中文文本中的 AI 写作痕迹，使内容读起来更像真人书写。检测并修复 24 类模式：AI 高频词（此外/深入探讨/至关重要等）、夸大意义表述、三段式排比、否定式排比、填充短语、破折号滥用、通用积极结论、粗体/emoji 装饰。附 50 分质量评分标准",
+      trigger: "自动：生成中文文章、报告正文、总结、分析叙述、邮件等连续性文字时触发",
+      tip: "写在 CLAUDE.md 全局规则里；代码注释、命令输出、短回复不触发；配合 report-qa 使用可覆盖「数据准确 + 文字自然」的完整输出质量闭环",
+      invoke: "CLAUDE.md 全局规则 · 自动 / /humanizer-zh"
+    },
+    {
+      name: "planning-with-files",
+      origin: "global",
+      cat: "memory",
+      desc: "把 AI 的工作记忆从易丢失的上下文窗口转移到项目目录里的 3 个持久文件：task_plan.md（目标与待办）、findings.md（发现与踩坑）、progress.md（每次会话做了什么、下次从哪继续）。跨会话连续性的核心基础设施",
+      trigger: "自动：开始处理多步骤任务或在有 task_plan.md 的项目目录工作时触发；说「继续」时读取进度文件恢复上下文",
+      tip: "解决重开 Claude Code 失忆问题；每次会话结束前自动更新 progress.md；与 GOTCHAS.md 互补——findings.md 记过程发现，GOTCHAS 记已知陷阱",
+      invoke: "/planning-with-files"
+    },
+    {
+      name: "frontend-design",
+      origin: "global",
+      cat: "frontend",
+      desc: "为前端界面生成有辨识度、有个性的设计——避免千篇一律的 AI 风格（紫色渐变/Inter字体/默认卡片布局）。根据内容上下文自主选择设计方向（editorial / dark terminal / brutalist 等），输出生产级自包含 HTML/CSS/JS",
+      trigger: "手动调用 /frontend-design，或说「帮我设计页面」「重新设计这个 UI」「生成前端 demo」时自动触发",
+      tip: "每次生成风格都不同，由 AI 根据内容语境决定方向；已生成过：S7 备考工具（dark terminal）/ CSAT 双周报（editorial 印刷风）/ 运营月报（mission control 暗色）",
+      invoke: "/frontend-design"
+    },
+    {
+      name: "frontend-qa",
+      origin: "global",
+      cat: "frontend",
+      desc: "全局前端质量审查：任何时候生成或修改 HTML/CSS/JS，交付前自动检查字体层级、间距对齐、颜色对比度、禁止模式（彩色侧边框/渐变文字/英雄卡片模板）、AI 审美测试。发现问题直接修复，最后输出一行 AUDIT 摘要",
+      trigger: "自动：生成任意前端代码（完整页面 / 组件 / 本地工具）时触发，无需手动调用",
+      tip: "写在 CLAUDE.md 全局规则里，优先级与 task-verify 相同；配合 frontend-design 使用时构成「生成 → 自动审查 → 修复」完整闭环",
+      invoke: "CLAUDE.md 全局规则 · 自动"
+    },
+    {
+      name: "impeccable",
+      origin: "global",
+      cat: "frontend",
+      desc: "前端界面设计审查与优化工具，覆盖 UX 评审、视觉层级、排版、间距、颜色、动效、响应式、无障碍、性能等全方位检查。包含 20+ 子命令：audit（技术质检）、critique（UX 评审）、polish（精修）、typeset（排版优化）、animate（动效）、bolder/quieter（风格调整）等",
+      trigger: "手动调用 /impeccable <子命令>，或说「审查这个页面」「优化这个界面」时触发",
+      tip: "配合 frontend-design 使用：frontend-design 生成 → impeccable audit/critique 审查；audit 专注技术问题，critique 专注 UX 体验",
+      invoke: "/impeccable audit|critique|polish|typeset..."
+    }
+  ],
+  // ── 工具探索地图 ────────────────────────────────────────────────────────
+  unusedTools: [
+    {
+      name: "Telegram Bot",
+      cat: "infra",
+      priority: "now",
+      desc: "比飞书 Webhook 更简单的个人消息通道，10 行 Python 即可实现「任务完成 / 告警 / 日报」直达手机，无需企业账号"
+    },
+    {
+      name: "Cursor / Windsurf",
+      cat: "ai",
+      priority: "now",
+      desc: "专为编程优化的 AI IDE，内置 Tab 补全、多文件感知、Composer 多步任务执行——比在普通编辑器里贴代码体验流畅 10 倍"
+    },
+    {
+      name: "Perplexity AI",
+      cat: "ai",
+      priority: "now",
+      desc: "带引用来源的 AI 搜索引擎，快速调研技术方案、查竞品、验证事实——比 ChatGPT 更适合需要核实来源的研究任务"
+    },
+    {
+      name: "n8n / Make",
+      cat: "automation",
+      priority: "next",
+      desc: "可视化拖拽式工作流自动化，连接 300+ 应用，无需写代码就能搭建「触发 → 处理 → 通知」的自动化链路"
+    },
+    {
+      name: "Vercel",
+      cat: "frontend",
+      priority: "next",
+      desc: "比 GitHub Pages 更强的前端部署平台，支持环境变量、API 路由、自定义域名，一行命令部署，自动 HTTPS"
+    },
+    {
+      name: "Vector DB (Chroma)",
+      cat: "ai",
+      priority: "next",
+      desc: "存储文本的语义向量，让 AI 在大量文档中精确找到相关段落——给 AI 装「长期记忆」的技术基础，适合做知识库问答系统"
+    },
+    {
+      name: "NotebookLM",
+      cat: "ai",
+      priority: "next",
+      desc: "上传 PDF/文档后 AI 深度理解内容，可问答、摘要、生成播客——适合消化大量学习材料（备考资料、技术文档）"
+    },
+    {
+      name: "Dify",
+      cat: "ai",
+      priority: "next",
+      desc: "开源 LLM 应用平台，可视化搭建 RAG 知识库 + Chatbot + Agent——想给报表工具加「自然语言查询」功能时的最快路径"
+    }
+  ]
+};
+// ════════════════════════════════════════════════════
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const d = DATA;
+  const lv = d.assessment.level;
+
+  // ── Header ──
+  document.getElementById('lv-num').textContent  = `Lv.${lv}`;
+  document.getElementById('lv-name').textContent = d.levelNames[lv];
+  document.getElementById('lv-desc').textContent = d.levelDescs[lv];
+
+  // ── Progress bar ──
+  const track = document.getElementById('progress-track');
+  for (let i = 0; i <= 10; i++) {
+    const s = document.createElement('div');
+    s.className = 'progress-step' + (i < lv ? ' filled' : '') + (i === lv ? ' current' : '');
+    s.setAttribute('data-label', `Lv.${i} ${d.levelNames[i]}`);
+    track.appendChild(s);
+  }
+  const nextLv = lv < 10 ? lv + 1 : 10;
+  document.getElementById('next-level-label').textContent =
+    `下一级：Lv.${nextLv} ${d.levelNames[nextLv]}`;
+
+  // ── Dimensions ──
+  const dims = [
+    { key: 'control', label: '可控性', sub: '约束 · 上下文 · Prompt 设计', improve: '建立 Prompt 模板库，把常用场景固定下来，减少每次从零设计的时间' },
+    { key: 'breadth', label: '广度',   sub: '跨领域 · 工具栈扩张',         improve: '尝试 AI 辅助创意创作（图像/视频生成），向 Lv.8 双线并进方向推进' },
+    { key: 'form',    label: '形态',   sub: 'ChatBot → Agent',             improve: '减少对 AI 的引导依赖——只说目标不说步骤，让 Agent 自主决策更多环节' },
+    { key: 'role',    label: '角色',   sub: '消费者 → 创造者',             improve: '构建面向更广受众的产品，或指导他人建立自己的 AI 工作流' }
+  ];
+  const dimList = document.getElementById('dim-list');
+  dims.forEach(dim => {
+    const score = d.assessment.dimensions[dim.key];
+    dimList.innerHTML += `
+      <div class="dim-item">
+        <div class="dim-header">
+          <span class="dim-name">${dim.label} <span class="dim-sub">${dim.sub}</span></span>
+          <span class="dim-score">${score}/10</span>
+        </div>
+        <div class="dim-bar"><div class="dim-fill" style="width:${score*10}%"></div></div>
+        ${dim.improve ? `<div class="dim-improve">${dim.improve}</div>` : ''}
+      </div>`;
+  });
+
+  // ── Radar chart ──
+  try {
+    const ctx = document.getElementById('radarChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'radar',
+      data: {
+        labels: dims.map(d => d.label),
+        datasets: [{
+          label: '当前',
+          data: dims.map(dim => d.assessment.dimensions[dim.key]),
+          fill: true,
+          backgroundColor: 'rgba(167,139,250,0.2)',
+          borderColor: '#7c3aed',
+          borderWidth: 2,
+          pointBackgroundColor: '#7c3aed',
+          pointRadius: 5
+        }]
+      },
+      options: {
+        scales: {
+          r: {
+            min: 0, max: 10, ticks: { stepSize: 2, display: false },
+            grid: { color: '#ede9fe' },
+            angleLines: { color: '#ede9fe' },
+            pointLabels: { font: { size: 13, weight: '600' }, color: '#374151' }
+          }
+        },
+        plugins: { legend: { display: false } },
+        elements: { line: { tension: 0.1 } }
+      }
+    });
+  } catch (e) {
+    document.getElementById('radarChart').parentElement.innerHTML =
+      '<div style="text-align:center;color:#bbb;padding:2rem;font-size:0.85rem">雷达图加载失败（CDN 不可用）</div>';
+  }
+
+  // ── Helpers ──
+  function levelCompletion(i) {
+    const ev = d.levelEvidence[i];
+    if (!ev || !ev.criteria || !ev.criteria.length) return null;
+    const score = ev.criteria.reduce((s, c) => s + (c.status === 'done' ? 1 : c.status === 'partial' ? 0.5 : 0), 0);
+    return Math.round(score / ev.criteria.length * 100);
+  }
+
+  // ── Why card title ──
+  document.getElementById('why-title').textContent = `为什么是 Lv.${lv} ${d.levelNames[lv]}`;
+  document.getElementById('next-steps-title').textContent = `升到 Lv.${lv+1} ${d.levelNames[lv+1]} 还差什么`;
+
+  // ── Why Lv card ──
+  const whyList = document.getElementById('why-list');
+  d.whyEvidence.forEach(e => {
+    whyList.innerHTML += `
+      <div class="why-item">
+        <div class="why-check">✓</div>
+        <div class="why-text"><span class="why-label">${e.label}</span> — ${e.detail}</div>
+      </div>`;
+  });
+
+  // ── Level Progress Overview ──
+  const overviewRows = document.getElementById('lp-overview-rows');
+  for (let i = 3; i <= 10; i++) {
+    const pct = levelCompletion(i);
+    if (pct === null) continue;
+    const isPast    = i < lv;
+    const isCurrent = i === lv;
+    const fillCls   = isPast ? 'lp-past' : isCurrent ? 'lp-current' : 'lp-future';
+    let statusHtml = '';
+    if (pct >= 85 && isPast)    statusHtml = `<span class="lp-status lp-status-done">已通关</span>`;
+    else if (pct >= 85)         statusHtml = `<span class="lp-status lp-status-done">可晋级 ✓</span>`;
+    else if (isCurrent)         statusHtml = `<span class="lp-status lp-status-current">进行中</span>`;
+    else                        statusHtml = `<span class="lp-status lp-status-future">未解锁</span>`;
+    overviewRows.innerHTML += `
+      <div class="lp-row">
+        <div class="lp-label">Lv.${i} ${d.levelNames[i]}</div>
+        <div class="lp-bar"><div class="lp-bar-fill ${fillCls}" style="width:${pct}%"></div></div>
+        <div class="lp-pct">${pct}%</div>
+        ${statusHtml}
+      </div>`;
+  }
+
+  // ── Timeline ──
+  const pillsEl = document.getElementById('tl-pills');
+  let activeTl = lv;
+
+  function renderPanel(i) {
+    const ev = d.levelEvidence[i];
+    const isCurrent = i === lv;
+    const isFuture = i > lv;
+    const badge = isCurrent ? '<span class="tl-panel-badge">当前</span>'
+                : isFuture  ? '<span class="tl-panel-badge future-badge">未到达</span>'
+                :             '<span class="tl-panel-badge" style="background:#c4b5fd;color:#4c1d95">已达成</span>';
+    const imgEl = ev.img
+      ? `<img class="tl-panel-img" src="${ev.img}" alt="Lv.${i}" onerror="this.style.display='none'">`
+      : `<div class="tl-panel-img-placeholder">${i}</div>`;
+
+    let achievementEl = '';
+    if (ev.userAchievements) {
+      achievementEl = `
+        <div class="user-achievement">
+          <div class="user-achievement-label">${isCurrent ? '你现在正在做的' : '你是怎么到这一级的'}</div>
+          <div class="user-achievement-text">${ev.userAchievements}</div>
+        </div>`;
+    } else if (isFuture) {
+      achievementEl = `
+        <div class="user-achievement" style="border-color:#e5e7eb;background:#f3f4f6">
+          <div class="user-achievement-label" style="color:#9ca3af">还没到达</div>
+          <div class="user-achievement-text" style="color:#9ca3af">继续前进，这一级等着你解锁！</div>
+        </div>`;
+    }
+
+    let criteriaEl = '';
+    if (ev.criteria && ev.criteria.length) {
+      const pct = levelCompletion(i);
+      const dotMap = { done: '✓', partial: '~', not: '✗' };
+      const items = ev.criteria.map(c =>
+        `<div class="criterion-item criterion-${c.status}">
+          <div class="criterion-dot">${dotMap[c.status]}</div>
+          <span class="criterion-text">${c.text}</span>
+        </div>`
+      ).join('');
+      criteriaEl = `
+        <div class="criteria-header">
+          <span class="criteria-header-label">达成检查项</span>
+          <span class="criteria-pct">${pct}%${pct >= 85 ? ' ✓' : ''}</span>
+        </div>
+        <div class="criteria-track"><div class="criteria-fill" style="width:${pct}%"></div></div>
+        <div class="criteria-list">${items}</div>`;
+    }
+
+    document.getElementById('tl-panel').innerHTML = `
+      ${imgEl}
+      <div class="tl-panel-body">
+        <div class="tl-panel-header">
+          <span class="tl-panel-lv">Lv.${i}</span>
+          <span class="tl-panel-name">${d.levelNames[i]}</span>
+          ${badge}
+        </div>
+        <div class="tl-panel-desc">${d.levelDescs[i]}</div>
+        <div class="tl-panel-evidence">${ev.text}</div>
+        ${achievementEl}
+        ${criteriaEl}
+      </div>`;
+  }
+
+  for (let i = 0; i <= 10; i++) {
+    const pill = document.createElement('div');
+    const cls = i < lv ? 'past' : i === lv ? 'current' : 'future';
+    pill.className = `tl-pill ${cls}${i === activeTl ? ' active' : ''}`;
+    pill.textContent = `${i} ${d.levelNames[i]}`;
+    pill.dataset.lv = i;
+    pill.addEventListener('click', () => {
+      activeTl = i;
+      document.querySelectorAll('.tl-pill').forEach(p => p.classList.remove('active'));
+      pill.classList.add('active');
+      renderPanel(i);
+    });
+    pillsEl.appendChild(pill);
+  }
+  renderPanel(activeTl);
+
+  // ── Next steps ──
+  const stepsList = document.getElementById('steps-list');
+  d.nextSteps.forEach((step, i) => {
+    stepsList.innerHTML += `
+      <li>
+        <div class="step-icon">${i + 1}</div>
+        <span>${step}</span>
+      </li>`;
+  });
+
+  // ── Projects ──
+  const tagClass = { automation: 'tag-automation', ai: 'tag-ai', infra: 'tag-infra', frontend: 'tag-frontend', prompt: 'tag-prompt' };
+  const grid = document.getElementById('projects-grid');
+  d.projects.forEach((proj, idx) => {
+    const fileUrl = 'file:///' + proj.path.replace(/\\/g, '/');
+    const techRows = proj.techniques.map(t =>
+      `<div class="tech-row">
+        <span class="tag ${tagClass[t.cat] || ''}">${t.name}</span>
+        <span class="tech-use">${t.use}</span>
+      </div>`
+    ).join('');
+
+    let detailHtml = '';
+    if (proj.details) {
+      const sectionsHtml = proj.details.sections.map(s =>
+        `<div class="detail-section">
+          <div class="detail-section-title">${s.title}</div>
+          <ul class="detail-section-list">${s.items.map(i => `<li>${i}</li>`).join('')}</ul>
+        </div>`
+      ).join('');
+      detailHtml = `
+        <button class="project-detail-toggle" data-idx="${idx}">▼ 查看详细配置</button>
+        <div class="project-detail-panel" id="detail-panel-${idx}">
+          <div class="detail-workflow">${proj.details.workflow}</div>
+          ${sectionsHtml}
+        </div>`;
+    }
+
+    grid.innerHTML += `
+      <div class="project-card">
+        <div class="project-header">
+          <div class="project-name">${proj.name}</div>
+          <a class="project-open" href="${fileUrl}" title="在文件浏览器中打开">打开</a>
+        </div>
+        <div class="project-path">${proj.path}</div>
+        <div class="project-desc">${proj.desc}</div>
+        <div class="techniques">${techRows}</div>
+        ${detailHtml}
+      </div>`;
+  });
+
+  // ── Achievement Log ──
+  const LOG_KEY = 'ai-growth-log';
+  function loadLog() { try { return JSON.parse(localStorage.getItem(LOG_KEY) || '[]'); } catch { return []; } }
+  function saveLog(entries) { localStorage.setItem(LOG_KEY, JSON.stringify(entries)); }
+  function renderLog() {
+    const entries = loadLog();
+    const list = document.getElementById('log-list');
+    if (!entries.length) {
+      list.innerHTML = '<div class="log-empty">还没有记录，写下第一条成长笔记吧</div>';
+      return;
+    }
+    list.innerHTML = entries.slice().reverse().map((e, ri) => {
+      const i = entries.length - 1 - ri;
+      return `<div class="log-entry">
+        <span class="log-date">${e.date}</span>
+        <span class="log-text">${e.text.replace(/</g,'&lt;')}</span>
+        <button class="log-del" data-i="${i}" title="删除">×</button>
+      </div>`;
+    }).join('');
+  }
+  // default date = today
+  const todayStr = new Date().toISOString().slice(0, 10);
+  document.getElementById('log-date').value = todayStr;
+
+  document.getElementById('log-add').addEventListener('click', () => {
+    const date = document.getElementById('log-date').value || todayStr;
+    const text = document.getElementById('log-text').value.trim();
+    if (!text) return;
+    const entries = loadLog();
+    entries.push({ date, text });
+    saveLog(entries);
+    document.getElementById('log-text').value = '';
+    renderLog();
+  });
+  document.getElementById('log-list').addEventListener('click', e => {
+    const btn = e.target.closest('.log-del');
+    if (!btn) return;
+    const entries = loadLog();
+    entries.splice(+btn.dataset.i, 1);
+    saveLog(entries);
+    renderLog();
+  });
+  renderLog();
+
+  document.getElementById('projects-grid').addEventListener('click', e => {
+    const btn = e.target.closest('.project-detail-toggle');
+    if (!btn) return;
+    const panel = document.getElementById(`detail-panel-${btn.dataset.idx}`);
+    const isOpen = panel.classList.toggle('open');
+    btn.textContent = isOpen ? '▲ 收起' : '▼ 查看详细配置';
+  });
+
+  // ── Skills ──
+  const skillCatClass = {
+    workflow: 'skill-cat-workflow', debug: 'skill-cat-debug',
+    memory: 'skill-cat-memory', infra: 'skill-cat-infra', data: 'skill-cat-data',
+    frontend: 'skill-cat-frontend'
+  };
+  const skillsGrid = document.getElementById('skills-grid');
+  const originLabel = { 'self': '自封装', 'global': '全局skill', 'project': '项目skill' };
+  d.skills.forEach(sk => {
+    const badge = sk.origin
+      ? `<span class="origin-badge origin-${sk.origin}">${originLabel[sk.origin] || sk.origin}</span>`
+      : '';
+    skillsGrid.innerHTML += `
+      <div class="skill-card ${skillCatClass[sk.cat] || ''}">
+        <div class="skill-header">
+          <span class="skill-name">${sk.name}</span>
+          <span class="skill-invoke">${sk.invoke}</span>
+          ${badge}
+        </div>
+        <div class="skill-desc">${sk.desc}</div>
+        <div class="skill-trigger">${sk.trigger}</div>
+        ${sk.tip ? `<div class="skill-tip">${sk.tip}</div>` : ''}
+      </div>`;
+  });
+
+  // ── Unused Tools ──
+  const unusedCatClass = {
+    automation: 'unused-cat-automation', infra: 'unused-cat-infra',
+    frontend: 'unused-cat-frontend', ai: 'unused-cat-ai'
+  };
+  const unusedGrid = document.getElementById('unused-grid');
+  d.unusedTools.forEach(tool => {
+    const priorityBadge = tool.priority === 'now'
+      ? `<span class="tool-priority-now">立即探索</span>`
+      : `<span class="tool-priority-next">下一阶段</span>`;
+    unusedGrid.innerHTML += `
+      <div class="unused-card ${unusedCatClass[tool.cat] || ''}">
+        <div class="unused-header">
+          <span class="unused-name">${tool.name}</span>
+          <span class="tag ${tagClass[tool.cat] || ''}">${tool.cat}</span>
+          ${priorityBadge}
+        </div>
+        <div class="unused-desc">${tool.desc}</div>
+      </div>`;
+  });
+});
+</script>
+
+<!-- ── Markup ── -->
+<div class="header">
+  <img class="header-bg-img" src="images/header-bg.png" alt="">
+  <div class="header-top">
+    <div>
+      <div class="header-label">Jean的 AI 成长仪表板</div>
+      <div class="level-row">
+        <div class="level-num" id="lv-num"></div>
+        <div class="level-name" id="lv-name"></div>
+      </div>
+      <div class="level-desc" id="lv-desc"></div>
+    </div>
+  </div>
+</div>
+
+<div class="progress-section">
+  <div class="progress-meta">
+    <span class="progress-meta-label">等级进度 Lv.0 → Lv.10</span>
+    <span class="progress-meta-next" id="next-level-label"></span>
+  </div>
+  <div class="progress-track" id="progress-track"></div>
+  <div class="progress-labels">
+    <span>Lv.0 旁观者</span>
+    <span>Lv.5 织网者</span>
+    <span>Lv.10 一人军团</span>
+  </div>
+</div>
+
+<div class="main">
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">四维度评估</div>
+      <div class="dim-list" id="dim-list"></div>
+    </div>
+    <div class="card">
+      <div class="card-title">能力雷达</div>
+      <div class="radar-wrap">
+        <canvas id="radarChart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="card why-card">
+    <div class="card-title" id="why-title"></div>
+    <div class="why-list" id="why-list"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-title">各级完成进度 — 达到 85% 方进入下一级</div>
+    <div id="lp-overview-rows"></div>
+  </div>
+
+  <div class="card timeline-card">
+    <div class="card-title">等级时间轴 — 点击查看每级详情 &amp; 你的达成故事</div>
+    <div class="timeline-pills" id="tl-pills"></div>
+    <div id="tl-panel" class="tl-panel"></div>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem">
+    <div class="card-title" id="next-steps-title"></div>
+    <ul class="steps-list" id="steps-list"></ul>
+  </div>
+
+  <div class="section-title">项目 · 技能清单</div>
+  <div class="projects-grid" id="projects-grid"></div>
+
+  <div style="margin-top:1.75rem">
+    <div class="section-title">Claude Code Skills — 已配置的 15 个全局技能（~/.claude/skills/）</div>
+    <div class="card">
+      <div class="card-title">调用方式：在对话中直接输入斜杠命令，或满足触发条件时自动激活</div>
+      <div class="skills-grid" id="skills-grid"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:1.75rem; margin-bottom:1.5rem">
+    <div class="section-title">成长日志 — 记录每一个 AI 里程碑</div>
+    <div class="card">
+      <div class="log-form">
+        <input type="date" class="log-input-date" id="log-date">
+        <input type="text" class="log-input-text" id="log-text" placeholder="记录今天的 AI 突破或新发现…">
+        <button class="log-btn" id="log-add">记录</button>
+      </div>
+      <div class="log-list" id="log-list"></div>
+    </div>
+  </div>
+
+  <div style="margin-top:1.75rem; margin-bottom:1rem">
+    <div class="section-title">工具探索地图</div>
+    <div class="unused-grid" id="unused-grid"></div>
+  </div>
+
+  <p style="text-align:right;font-size:0.75rem;color:#bbb;margin-top:1.5rem;padding-bottom:1rem">
+    由 Claude Code 自动维护
+  </p>
+</div>
+
+</body>
+</html>
